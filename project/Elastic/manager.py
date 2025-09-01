@@ -10,12 +10,12 @@ class Manager:
 
     def manager_start(self):
         # self.level1()
-        # print(1)
-        self.level2()
-        print(2)
+        #
+        # self.level2()
+        #
         self.level3()
-        print(3)
-        self.level4()
+        #
+        # self.level4()
         print(4)
     def level1(self):
         data_to_send = self.data.csv_load_data()

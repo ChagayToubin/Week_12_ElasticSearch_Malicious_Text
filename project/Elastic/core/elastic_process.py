@@ -1,5 +1,7 @@
 from elasticsearch import Elasticsearch
 from project.data.data_processor import Data_process
+from elasticsearch.helpers import scan
+
 
 
 class Es:
@@ -57,23 +59,21 @@ class Es:
             doc_id = hit["_id"]
             text = hit["_source"].get("text", "")
 
-            found = [w for w in weapons_list if w in text]
-            if found:
-                weapons_value = found
-            else:
-                weapons_value = "dount found"
+            found = [w for w in weapons_list if w.lower() in text.lower()]
 
-            if found:
-                self.es.update(
-                    index=self.index,
-                    id=doc_id,
-                    body={
-                        "doc": {
-                            "weapons": weapons_value
-                        }
+            weapons_value = found if found else []
+
+            self.es.update(
+                index=self.index,
+                id=doc_id,
+                body={
+                    "doc": {
+                        "weapons": weapons_value
                     }
-                )
-                print(f"Updated {doc_id} with weapons={found}")
+                }
+            )
+            print(f"Updated {doc_id} with weapons={weapons_value}")
+        self.es.indices.refresh(index=self.index)
 
     def update_all_documents_sentiment(self, data):
         docs = data
@@ -124,3 +124,45 @@ class Es:
             }
         }
         return mapping
+
+    def search_antisemtic_with_weapons(self):
+        query = {
+            "query": {
+                "bool": {
+                    "must": [
+                        {"term": {"Antisemitic": "1"}},
+                        {"script": {"script": "doc['weapons'].size() >= 2"}}
+                    ]
+                }
+            }
+        }
+        response = self.es.search(index=self.index, body=query)
+        hits=response["hits"]["hits"]
+        if not hits:
+            return {"message": "לא נמצאו מסמכים מתאימים"}
+        return hits
+
+    def search_docs_with_two_or_more_weapons(self):
+        query = {
+            "query": {
+                "bool": {
+                    "must": [
+                        {
+                            "script": {
+                                "script": {
+                                    "source": "doc['weapons'].size() >= 2"
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+
+        response = self.es.search(index=self.index, body=query)
+
+        hits = response["hits"]["hits"]
+        if not hits:
+            return {"message": "לא נמצאו מסמכים עם 2 כלי נשק או יותר"}
+        return hits
+
