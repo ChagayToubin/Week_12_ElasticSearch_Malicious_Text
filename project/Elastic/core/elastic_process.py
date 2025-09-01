@@ -18,22 +18,35 @@ class Es:
         response = self.es.search(
             index=self.index,
             body={"query": {"match_all": {}}},
-            size=1000
+            size=10000
         )
         return response["hits"]["hits"]
 
     def delet_Antisemitic(self):
+        # docs = es.search(
+        #     index=index_name,
+        #     body={
+        #         "query": {
+        #             "bool": {
+        #                 "must": [
+        #                     {"term": {"Antisemitic": 0}},
+        #                     {"term": {"weapons": "not found"}},
+        #                     {"terms": {"sentiment": ["neutral", "positive"]}}
+        #                 ]
+        #             }
+        #         }
+        #     },
         self.es.delete_by_query(
             index="tweets",
             body={
                 "query": {
                     "bool": {
-                        "should": [
-                            {"term": {"Antisemitic": 0}},  # לא אנטישמי
-                            {"term": {"weapons": "not found"}},  # כלי נשק = not found
-                            {"terms": {"sentiment": ["Neutral", "Positive"]}}  # רגש ניטרלי או חיובי
+                        "must": [
+                            {"term": {"Antisemitic": 0}},
+                            {"term": {"weapons": "not found"}},
+                            {"terms": {"sentiment": ["Neutral", "Positive"]}}
                         ],
-                        "minimum_should_match": 1
+
                     }
                 }
             }
