@@ -1,21 +1,103 @@
 from elasticsearch import Elasticsearch
+from project.data.data_processor import Data_process
+
 
 class Es:
-    def __init__(self,uri):
-        self.uri=uri
+    def __init__(self, uri):
+        self.uri = self.get_URI(uri)
+        self.index = "tweets"
+        self.es = self.connection()
 
-    def get_URI(self):
+    def get_URI(self, uri):
         return "http://localhost:9200"
 
     def connection(self):
         return Elasticsearch(self.uri)
 
-    def send_data(self,data):
+    def load_data(self):
+        response = self.es.search(
+            index=self.index,
+            body={"query": {"match_all": {}}},
+            size=1000
+        )
+        return response["hits"]["hits"]
 
-        es=self.connection()
+    def delet_Antisemitic(self):
+        self.es.delete_by_query(
+            index="tweets",
+            body={
+                "query": {
+                    "bool": {
+                        "should": [
+                            {"term": {"Antisemitic": 0}},  # לא אנטישמי
+                            {"term": {"weapons": "not found"}},  # כלי נשק = not found
+                            {"terms": {"sentiment": ["Neutral", "Positive"]}}  # רגש ניטרלי או חיובי
+                        ],
+                        "minimum_should_match": 1
+                    }
+                }
+            }
+        )
 
+    def add_weapons_to_docs(self, weapons_list, data):
+        for hit in data:
+            doc_id = hit["_id"]
+            text = hit["_source"].get("text", "")
 
-        index_name="tweets"
+            found = [w for w in weapons_list if w in text]
+            if found:
+                weapons_value = found
+            else:
+                weapons_value = "dount found"
+
+            if found:
+                self.es.update(
+                    index=self.index,
+                    id=doc_id,
+                    body={
+                        "doc": {
+                            "weapons": weapons_value
+                        }
+                    }
+                )
+                print(f"Updated {doc_id} with weapons={found}")
+
+    def update_all_documents_sentiment(self, data):
+        docs = data
+        for hit in docs:
+            doc_id = hit["_id"]
+            source = hit["_source"]
+            text = source.get("text", "")
+            sentiment = Data_process.classify_sentiment(text)
+            self.es.update(
+                index=self.index,
+                id=doc_id,
+                body={"doc": {"sentiment": sentiment}}
+            )
+            print(f"Updated doc {doc_id} with sentiment={sentiment}")
+
+    def send_data(self, data, index_name):
+        mapping = self.init_mapping(index_name)
+
+        if not self.es.indices.exists(index=self.index):
+            self.es.indices.create(index=self.index, body=mapping)
+
+        for i, doc in enumerate(data):
+            document = {
+                "text": data[i]["text"],
+                "TweetID": str(data[i]["TweetID"]),
+                "CreateDate": str(data[i]["CreateDate"]),
+                "Antisemitic": data[i]["Antisemitic"],
+                "sentiment": "empty",
+                "weapons": "empty"
+
+            }
+            self.es.index(index=self.index, id=i, body=document)
+            if i % 100 == 0:
+                print(f"Indexed {i} documents.")
+
+    def init_mapping(self, index_name):
+        self.index = index_name
         mapping = {
             "mappings": {
                 "properties": {
@@ -28,25 +110,4 @@ class Es:
                 }
             }
         }
-
-        if not es.indices.exists(index=index_name):
-            es.indices.create(index=index_name, body=mapping)
-
-        for i, doc in enumerate(data):
-            document = {
-                "text": data[i]["text"],
-                "TweetID":str(data[i]["TweetID"]),
-                "CreateDate":str(data[i]["CreateDate"]),
-                "Antisemitic":data[i]["Antisemitic"],
-                "sentiment":"empty",
-                "weapons":"empty"
-
-            }
-
-            es.index(index=index_name, id=i, body=document)
-            if i % 100 == 0:
-                print(f"Indexed {i} documents.")
-
-
-
-    # es = Elasticsearch('http://localhost:9200')
+        return mapping
