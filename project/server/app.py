@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from project.elastic.core.elastic_process import Es
+from project.elastic.elastic_process import Es
 import os
 app = FastAPI()
 uri_es=os.getenv("URI","http://localhost:9200")
