@@ -2,20 +2,22 @@ import csv
 
 import nltk
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
-
+from pathlib import Path
 nltk.download('vader_lexicon')
-
+base_dir = Path(__file__).resolve().parent
 
 class Data_process:
     @staticmethod
-    def txt_load(path):
-        with open(path, "r",  encoding="utf-8-sig") as file:
+    def txt_load():
+        txt_path=base_dir / "weapon_list.txt"
+        with open(txt_path, "r",  encoding="utf-8-sig") as file:
             data = [line.strip() for line in file.readlines()]
         return data
 
     @staticmethod
     def csv_load_data():
-        with open("../data/tweets_injected 3.csv", "r", encoding="utf-8") as file:
+        csv_path = base_dir / "tweets_injected 3.csv"
+        with open(csv_path, "r", encoding="utf-8") as file:
             reader = csv.DictReader(file)
             data = [row for row in reader]  # list of dictionaries
         return data
